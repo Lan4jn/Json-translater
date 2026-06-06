@@ -1,0 +1,17 @@
+package main
+
+import (
+	"os"
+
+	"json2table/internal/app"
+	"json2table/internal/cli"
+	"json2table/internal/desktopgui"
+)
+
+func main() {
+	program := app.App{
+		RunCLI: cli.Run,
+		RunGUI: desktopgui.Run,
+	}
+	os.Exit(program.Run(os.Args[1:], os.Stdout, os.Stderr))
+}

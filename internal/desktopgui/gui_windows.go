@@ -45,16 +45,16 @@ func writeTempPowerShellScript(script string) (string, error) {
 }
 
 func windowsPowerShellCommand(scriptPath string) (string, []string) {
+	if pwsh, err := exec.LookPath("pwsh.exe"); err == nil {
+		return pwsh, []string{"-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
+	}
+
 	home := os.Getenv("USERPROFILE")
 	if home != "" {
 		pwshBat := filepath.Join(home, "bin", "pwsh.bat")
 		if fileExists(pwshBat) {
 			return "cmd.exe", []string{"/C", pwshBat, "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
 		}
-	}
-
-	if pwsh, err := exec.LookPath("pwsh.exe"); err == nil {
-		return pwsh, []string{"-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", scriptPath}
 	}
 
 	windir := os.Getenv("WINDIR")

@@ -1,0 +1,17 @@
+# Build outputs
+dist/
+*.exe
+
+# Test and coverage outputs
+*.test
+coverage.out
+
+# Local/editor files
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store

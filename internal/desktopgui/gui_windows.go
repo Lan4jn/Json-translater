@@ -13,7 +13,7 @@ import (
 
 const (
 	cwUseDefault       = 0x80000000
-	colorWindow        = 5
+	colorBtnFace       = 15
 	idcArrow           = 32512
 	swShow             = 5
 	wmCommand          = 0x0111
@@ -22,12 +22,16 @@ const (
 	wmSetFont          = 0x0030
 	bnClicked          = 0
 	cbnSelChange       = 1
-	wsOverlappedWindow = 0x00cf0000
+	wsCaption          = 0x00c00000
+	wsSysMenu          = 0x00080000
+	wsMinimizeBox      = 0x00020000
 	wsVisible          = 0x10000000
 	wsChild            = 0x40000000
 	wsTabStop          = 0x00010000
+	wsExClientEdge     = 0x00000200
 	esAutoHScroll      = 0x0080
 	bsPushButton       = 0
+	bsDefPushButton    = 0x0001
 	cbsDropDownList    = 0x0003
 	cbsHasStrings      = 0x0200
 	ofnOverwritePrompt = 0x00000002
@@ -40,6 +44,11 @@ const (
 	mbIconInformation  = 0x00000040
 	mbIconWarning      = 0x00000030
 	mbIconError        = 0x00000010
+	fwNormal           = 400
+	fwSemiBold         = 600
+	defaultCharset     = 1
+	clearTypeQuality   = 5
+	variablePitch      = 2
 )
 
 const (
@@ -55,6 +64,7 @@ var (
 	user32               = syscall.NewLazyDLL("user32.dll")
 	kernel32             = syscall.NewLazyDLL("kernel32.dll")
 	comdlg32             = syscall.NewLazyDLL("comdlg32.dll")
+	gdi32                = syscall.NewLazyDLL("gdi32.dll")
 	procRegisterClassEx  = user32.NewProc("RegisterClassExW")
 	procCreateWindowEx   = user32.NewProc("CreateWindowExW")
 	procDefWindowProc    = user32.NewProc("DefWindowProcW")
@@ -75,6 +85,8 @@ var (
 	procGetModuleHandle  = kernel32.NewProc("GetModuleHandleW")
 	procGetOpenFileName  = comdlg32.NewProc("GetOpenFileNameW")
 	procGetSaveFileName  = comdlg32.NewProc("GetSaveFileNameW")
+	procCreateFont       = gdi32.NewProc("CreateFontW")
+	procDeleteObject     = gdi32.NewProc("DeleteObject")
 )
 
 type wndClassEx struct {
@@ -139,6 +151,7 @@ type windowState struct {
 	formatCombo uintptr
 	status      uintptr
 	font        uintptr
+	titleFont   uintptr
 }
 
 var activeWindow *windowState
@@ -155,7 +168,7 @@ func Run() error {
 		lpfnWndProc:   syscall.NewCallback(windowProc),
 		hInstance:     instance,
 		hCursor:       cursor,
-		hbrBackground: colorWindow + 1,
+		hbrBackground: colorBtnFace + 1,
 		lpszClassName: className,
 	}
 	if atom, _, err := procRegisterClassEx.Call(uintptr(unsafe.Pointer(&wc))); atom == 0 {
@@ -166,11 +179,11 @@ func Run() error {
 		0,
 		uintptr(unsafe.Pointer(className)),
 		uintptr(unsafe.Pointer(utf16Ptr("JSON 转 CSV/Excel"))),
-		wsOverlappedWindow,
+		wsCaption|wsSysMenu|wsMinimizeBox,
 		cwUseDefault,
 		cwUseDefault,
-		720,
-		330,
+		760,
+		390,
 		0,
 		0,
 		instance,
@@ -180,7 +193,7 @@ func Run() error {
 		return fmt.Errorf("创建窗口失败: %w", err)
 	}
 
-	state := &windowState{hwnd: hwnd, font: createUIFont()}
+	state := &windowState{hwnd: hwnd, font: createUIFont(), titleFont: createTitleFont()}
 	activeWindow = state
 	createControls(state, instance)
 	procShowWindow.Call(hwnd, swShow)
@@ -201,23 +214,29 @@ func Run() error {
 }
 
 func createControls(state *windowState, instance uintptr) {
-	addControl(state, "STATIC", "JSON 文件", wsChild|wsVisible, 24, 24, 120, 24, 0, instance)
-	state.inputEdit = addControl(state, "EDIT", "", wsChild|wsVisible|wsTabStop|esAutoHScroll, 24, 50, 520, 28, inputEditID, instance)
-	addControl(state, "BUTTON", "浏览...", wsChild|wsVisible|wsTabStop|bsPushButton, 560, 49, 110, 30, browseInputID, instance)
+	title := addControl(state, "STATIC", "JSON 转表格转换器", wsChild|wsVisible, 28, 22, 360, 30, 0, instance)
+	if title != 0 && state.titleFont != 0 {
+		procSendMessage.Call(title, wmSetFont, state.titleFont, 1)
+	}
+	addControl(state, "STATIC", "将 JSON 文件导出为 CSV 或 Excel 工作簿", wsChild|wsVisible, 28, 56, 520, 24, 0, instance)
 
-	addControl(state, "STATIC", "输出文件", wsChild|wsVisible, 24, 92, 120, 24, 0, instance)
-	state.outputEdit = addControl(state, "EDIT", "", wsChild|wsVisible|wsTabStop|esAutoHScroll, 24, 118, 520, 28, outputEditID, instance)
-	addControl(state, "BUTTON", "保存到...", wsChild|wsVisible|wsTabStop|bsPushButton, 560, 117, 110, 30, browseOutputID, instance)
+	addControl(state, "STATIC", "JSON 文件", wsChild|wsVisible, 28, 98, 120, 24, 0, instance)
+	state.inputEdit = addControlEx(state, wsExClientEdge, "EDIT", "", wsChild|wsVisible|wsTabStop|esAutoHScroll, 28, 122, 560, 30, inputEditID, instance)
+	addControl(state, "BUTTON", "选择...", wsChild|wsVisible|wsTabStop|bsPushButton, 606, 121, 112, 32, browseInputID, instance)
 
-	addControl(state, "STATIC", "输出格式", wsChild|wsVisible, 24, 160, 120, 24, 0, instance)
-	state.formatCombo = addControl(state, "COMBOBOX", "", wsChild|wsVisible|wsTabStop|cbsDropDownList|cbsHasStrings, 24, 186, 230, 160, formatComboID, instance)
+	addControl(state, "STATIC", "输出文件", wsChild|wsVisible, 28, 166, 120, 24, 0, instance)
+	state.outputEdit = addControlEx(state, wsExClientEdge, "EDIT", "", wsChild|wsVisible|wsTabStop|esAutoHScroll, 28, 190, 560, 30, outputEditID, instance)
+	addControl(state, "BUTTON", "另存为...", wsChild|wsVisible|wsTabStop|bsPushButton, 606, 189, 112, 32, browseOutputID, instance)
+
+	addControl(state, "STATIC", "输出格式", wsChild|wsVisible, 28, 234, 120, 24, 0, instance)
+	state.formatCombo = addControl(state, "COMBOBOX", "", wsChild|wsVisible|wsTabStop|cbsDropDownList|cbsHasStrings, 28, 258, 240, 160, formatComboID, instance)
 	comboAdd(state.formatCombo, "自动：默认 CSV")
 	comboAdd(state.formatCombo, "CSV")
 	comboAdd(state.formatCombo, "Excel XLSX")
 	procSendMessage.Call(state.formatCombo, cbSetCurSel, 0, 0)
 
-	addControl(state, "BUTTON", "转换", wsChild|wsVisible|wsTabStop|bsPushButton, 24, 238, 120, 36, convertButtonID, instance)
-	state.status = addControl(state, "STATIC", "", wsChild|wsVisible, 160, 246, 510, 24, 0, instance)
+	state.status = addControl(state, "STATIC", "准备就绪", wsChild|wsVisible, 28, 302, 540, 24, 0, instance)
+	addControl(state, "BUTTON", "开始转换", wsChild|wsVisible|wsTabStop|bsDefPushButton, 606, 292, 112, 36, convertButtonID, instance)
 }
 
 func windowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
@@ -233,6 +252,16 @@ func windowProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		procDestroyWindow.Call(hwnd)
 		return 0
 	case wmDestroy:
+		if activeWindow != nil {
+			if activeWindow.font != 0 {
+				procDeleteObject.Call(activeWindow.font)
+				activeWindow.font = 0
+			}
+			if activeWindow.titleFont != 0 {
+				procDeleteObject.Call(activeWindow.titleFont)
+				activeWindow.titleFont = 0
+			}
+		}
 		procPostQuitMessage.Call(0)
 		return 0
 	default:
@@ -308,8 +337,12 @@ func selectedFormat() string {
 }
 
 func addControl(state *windowState, className, text string, style uintptr, x, y, width, height int32, id int, instance uintptr) uintptr {
+	return addControlEx(state, 0, className, text, style, x, y, width, height, id, instance)
+}
+
+func addControlEx(state *windowState, exStyle uintptr, className, text string, style uintptr, x, y, width, height int32, id int, instance uintptr) uintptr {
 	hwnd, _, _ := procCreateWindowEx.Call(
-		0,
+		exStyle,
 		uintptr(unsafe.Pointer(utf16Ptr(className))),
 		uintptr(unsafe.Pointer(utf16Ptr(text))),
 		style,
@@ -384,7 +417,35 @@ func fileDialog(owner uintptr, open bool, initialPath, filter, defExt string, fi
 }
 
 func createUIFont() uintptr {
-	return 0
+	return createFont(-15, fwNormal)
+}
+
+func createTitleFont() uintptr {
+	return createFont(-20, fwSemiBold)
+}
+
+func createFont(height int32, weight uintptr) uintptr {
+	font, _, _ := procCreateFont.Call(
+		signedInt32Param(height),
+		0,
+		0,
+		0,
+		weight,
+		0,
+		0,
+		0,
+		defaultCharset,
+		0,
+		0,
+		clearTypeQuality,
+		variablePitch,
+		uintptr(unsafe.Pointer(utf16Ptr("Microsoft YaHei UI"))),
+	)
+	return font
+}
+
+func signedInt32Param(value int32) uintptr {
+	return uintptr(int64(value))
 }
 
 func messageBox(owner uintptr, text, title string, flags uintptr) {

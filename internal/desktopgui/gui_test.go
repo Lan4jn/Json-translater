@@ -10,9 +10,9 @@ func TestDefaultOutputPathUsesCSVNextToInput(t *testing.T) {
 	}
 }
 
-func TestPowerShellStringEscapesSingleQuotes(t *testing.T) {
-	got := powerShellString(`C:\Users\O'Brien\out.csv`)
-	want := `'C:\Users\O''Brien\out.csv'`
+func TestDefaultOutputPathForFormatUsesXLSX(t *testing.T) {
+	got := defaultOutputPathForFormat(`C:\data\people.json`, "xlsx")
+	want := `C:\data\people.xlsx`
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}

@@ -4,7 +4,7 @@
 
 ## 使用方式
 
-不带参数运行时会启动图形界面。Windows 使用系统文件选择/保存对话框；Linux 使用 `zenity` 或 `kdialog`：
+不带参数运行时会启动图形界面。Windows 使用程序内置的原生桌面窗口；Linux 图形环境使用 `zenity` 或 `kdialog`：
 
 ```powershell
 .\json2table.exe
@@ -20,7 +20,20 @@
 
 `-format` 可选，支持 `csv`、`xlsx`。不传时默认 CSV；输出文件名为 `.xlsx` 时自动生成 Excel。
 
-Linux 图形界面模式需要系统已安装 `zenity` 或 `kdialog`。如果没有这些组件，仍可使用命令行模式。
+Linux 图形界面模式需要系统已安装 `zenity` 或 `kdialog`。常见安装方式：
+
+```bash
+# Debian / Ubuntu
+sudo apt install zenity
+
+# Fedora
+sudo dnf install zenity
+
+# Arch
+sudo pacman -S zenity
+```
+
+如果没有这些组件，仍可使用命令行模式。
 
 ## JSON 结构
 
@@ -51,4 +64,10 @@ Linux:
 
 ```powershell
 $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o dist/json2table-linux-amd64 .
+```
+
+在 Linux 本机也可以直接运行：
+
+```bash
+go build -o dist/json2table-linux-amd64 .
 ```

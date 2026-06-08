@@ -4,10 +4,16 @@
 
 ## 使用方式
 
-不带参数运行时会启动图形界面。Windows 使用程序内置的原生桌面窗口；Linux 图形环境使用 `zenity` 或 `kdialog`：
+不带参数运行时会启动图形界面。Windows 使用程序内置的原生桌面窗口；Linux 图形环境会优先使用 `zenity` 或 `kdialog`。如果桌面 GUI 组件不可用，程序会自动切换到本地 WebUI：
 
 ```powershell
 .\json2table.exe
+```
+
+也可以直接启动浏览器版 WebUI：
+
+```powershell
+.\json2table.exe --webui
 ```
 
 带参数运行时使用命令行模式：
@@ -20,7 +26,9 @@
 
 `-format` 可选，支持 `csv`、`xlsx`。不传时默认 CSV；输出文件名为 `.xlsx` 时自动生成 Excel。
 
-Linux 图形界面模式需要系统已安装 `zenity` 或 `kdialog`。常见安装方式：
+Linux 原生图形界面模式建议系统已安装 `zenity` 或 `kdialog`。统信 UOS / Deepin 等环境如果没有这些组件，会回退到本地 WebUI 并自动打开浏览器。
+
+常见安装方式：
 
 ```bash
 # Debian / Ubuntu
@@ -31,6 +39,12 @@ sudo dnf install zenity
 
 # Arch
 sudo pacman -S zenity
+```
+
+如需强制尝试 XDG Desktop Portal 文件选择器，可设置环境变量：
+
+```bash
+JSON2TABLE_USE_PORTAL=1 ./json2table-linux-amd64
 ```
 
 如果没有这些组件，仍可使用命令行模式。

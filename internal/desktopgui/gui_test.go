@@ -17,3 +17,20 @@ func TestDefaultOutputPathForFormatUsesXLSX(t *testing.T) {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
 }
+
+func TestSelectedPathFromPortalURIsDecodesFileURI(t *testing.T) {
+	got, err := selectedPathFromPortalURIs([]string{"file:///home/uos/%E6%95%B0%E6%8D%AE.json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "/home/uos/数据.json"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestSelectedPathFromPortalURIsRejectsNonFileURI(t *testing.T) {
+	if _, err := selectedPathFromPortalURIs([]string{"https://example.com/data.json"}); err == nil {
+		t.Fatal("expected error for non-file URI")
+	}
+}
